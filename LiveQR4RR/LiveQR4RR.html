@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TDG // Stretched PFP QR</title>
+    
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css" />
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #050811;
+            --glow-color: #00d2ff;
+            --accent-color: #9d50bb;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: radial-gradient(at 50% 50%, rgba(0, 210, 255, 0.15) 0px, transparent 80%);
+            color: white;
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .tool-container {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 40px;
+            padding: 50px;
+            backdrop-filter: blur(20px);
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        h2 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #00d2ff, #9d50bb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            color: #a0aec0;
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+            letter-spacing: 1px;
+        }
+
+        input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 18px;
+            width: 100%;
+            color: white;
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+            transition: 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--glow-color);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        #qr-output {
+            background: white;
+            padding: 10px;
+            border-radius: 15px;
+            display: inline-block;
+            margin-bottom: 30px;
+            overflow: hidden;
+            line-height: 0;
+            box-shadow: 0 0 30px rgba(0, 210, 255, 0.2);
+        }
+
+        .btn-action {
+            color: white;
+            border: none;
+            border-radius: 15px;
+            padding: 15px 40px;
+            font-weight: 700;
+            text-transform: uppercase;
+            transition: 0.3s;
+            text-decoration: none;
+            display: inline-block;
+            cursor: pointer;
+        }
+
+        .btn-png { 
+            background: linear-gradient(45deg, var(--accent-color), #6b21a8); 
+        }
+
+        .btn-action:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(157, 80, 187, 0.4);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="tool-container">
+        <h2>TDG LIVE QR</h2>
+        <p class="subtitle">STRETCHED TO FIT PFP (SAFE OVAL)</p>
+        
+        <input type="text" id="link-input" placeholder="Enter link (e.g. rec.net/user/TDG)" autocomplete="off">
+        
+        <div id="qr-display-area">
+            <div id="qr-output"><span>Awaiting Data...</span></div>
+        </div>
+
+        <div class="button-group">
+            <button id="download-btn" class="btn-action btn-png" py-click="download_qr">Download Stretched PFP</button>
+        </div>
+    </div>
+
+    <py-config>
+        packages = ["qrcode", "Pillow"]
+    </py-config>
+
+    <script type="py">
+        import qrcode
+        import io
+        import base64
+        import math
+        from PIL import Image
+        from pyscript import document
+
+        # Global storage for the high-res version
+        last_high_res_base64 = None
+
+        def generate_stretched_logic(data, width=2560, height=1440):
+            # 1. Create QR
+            qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_H, border=1)
+            qr.add_data(data)
+            qr.make(fit=True)
+            qr_img = qr.make_image(fill_color="black", back_color="white").convert('RGB')
+
+            # 2. Safe Oval Math (math.sqrt(2))
+            safe_width = int(width / math.sqrt(2))
+            safe_height = int(height / math.sqrt(2))
+
+            # 3. Stretch
+            qr_stretched = qr_img.resize((safe_width, safe_height), Image.Resampling.LANCZOS)
+
+            # 4. Final Canvas
+            canvas = Image.new('RGB', (width, height), (255, 255, 255))
+            paste_x = (width - safe_width) // 2
+            paste_y = (height - safe_height) // 2
+            canvas.paste(qr_stretched, (paste_x, paste_y))
+            
+            return canvas
+
+        def generate_live(event=None):
+            global last_high_res_base64
+            user_input = document.querySelector("#link-input").value
+            
+            if not user_input:
+                user_input = " " # Blank state
+
+            # Generate High Res for download storage
+            full_res_img = generate_stretched_logic(user_input)
+            
+            # Convert to Base64 for download
+            buf_full = io.BytesIO()
+            full_res_img.save(buf_full, format="JPEG", quality=95)
+            last_high_res_base64 = f"data:image/jpeg;base64,{base64.b64encode(buf_full.getvalue()).decode()}"
+
+            # Create smaller preview for the web UI (Maintains 16:9)
+            preview_img = full_res_img.resize((400, 225), Image.Resampling.LANCZOS)
+            buf_pre = io.BytesIO()
+            preview_img.save(buf_pre, format="PNG")
+            preview_base64 = base64.b64encode(buf_pre.getvalue()).decode()
+            
+            document.querySelector("#qr-output").innerHTML = f'<img src="data:image/png;base64,{preview_base64}" style="width:100%; max-width:400px;">'
+
+        def download_qr(event):
+            if last_high_res_base64:
+                link = document.createElement('a')
+                link.href = last_high_res_base64
+                link.download = 'TDG_Stretched_PFP.jpg'
+                link.click()
+
+        document.querySelector("#link-input").oninput = generate_live
+        generate_live() # Initialize
+    </script>
+</body>
+</html>
